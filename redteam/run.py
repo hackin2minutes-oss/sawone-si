@@ -142,10 +142,12 @@ def main():
         if importlib.util.find_spec("garak") is None:
             print("garak not installed", file=sys.stderr); ok = False
         try:
-            if subprocess.run(["promptfoo", "--version"], capture_output=True).returncode != 0:
+            res = subprocess.run(["promptfoo", "--version"], capture_output=True, text=True)
+            if res.returncode != 0:
+                print(f"promptfoo exited with code {res.returncode}: {res.stderr or res.stdout}", file=sys.stderr)
                 raise FileNotFoundError
-        except (FileNotFoundError, OSError):
-            print("promptfoo not runnable", file=sys.stderr); ok = False
+        except (FileNotFoundError, OSError) as e:
+            print(f"promptfoo not runnable: {e}", file=sys.stderr); ok = False
         json.loads((out / "garak-generator.json").read_text())
         json.loads((out / "promptfoo-redteam.yaml").read_text())
         scrub_secrets(out)   # leave only the redacted config, same as a real run

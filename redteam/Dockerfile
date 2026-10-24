@@ -18,7 +18,7 @@ RUN apt-get update \
 # garak pulls a large ML stack; it is pinned in requirements.txt. promptfoo is pinned too.
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt \
-    && npm install -g promptfoo@0.117.0 \
+    && npm install -g promptfoo@0.125.0 \
     && npm cache clean --force
 
 COPY run.py /opt/redteam/run.py

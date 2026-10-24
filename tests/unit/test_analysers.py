@@ -98,10 +98,11 @@ def test_ai_iac_checks():
 def test_ai_rule_pack_finds_planted_flaws(tmp_path):
     app = tmp_path / "vulnai"
     shutil.copytree(APP, app)
+    env = dict(os.environ, SEMGREP_ENABLE_VERSION_CHECK="0")
     p = subprocess.run(["semgrep", "scan", "--metrics=off", "--quiet", "--json", "--config",
                         str(ROOT / "scanner" / "rules" / "ai.yml"), str(app)],
                        capture_output=True, text=True,
-                       env={"SEMGREP_ENABLE_VERSION_CHECK": "0", "PATH": "/usr/bin:/usr/local/bin"})
+                       env=env)
     d = json.loads(p.stdout)
     assert not [e for e in d.get("errors", []) if "Rule" in e.get("message", "")]
     fired = {r["check_id"].split(".")[-1] for r in d["results"]}
