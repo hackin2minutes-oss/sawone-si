@@ -27,6 +27,7 @@ its scanner directory (/opt/sawone in the image).
 """
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
