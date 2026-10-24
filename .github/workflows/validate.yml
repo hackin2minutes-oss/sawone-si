@@ -115,8 +115,11 @@ jobs:
             jq -e --arg s "$st" '[.stages[] | select(.stage == $s and .status == "failed")] | length > 0' "$s" > /dev/null \
               || { echo "::error::$st did not fail on the vulnerable fixture"; bad=1; }
           done
-          jq -e '[.stages[] | select(.stage == "ai-redteam" and .status == "skipped")] | length > 0' "$s" > /dev/null \
-            || { echo "::error::ai-redteam should be skipped (no endpoint configured)"; bad=1; }
+          # ai-redteam is a separate workflow job that is skipped when no endpoint is configured.
+          # When skipped, no scanner runs, so no summary.json row is written — that is expected.
+          # Verify only that ai-redteam did not fail or error if it did run.
+          rt_bad=$(jq '[.stages[] | select(.stage == "ai-redteam" and (.status == "failed" or .status == "error"))] | length' "$s")
+          [ "$rt_bad" = 0 ] || { echo "::error::ai-redteam unexpectedly failed/errored"; bad=1; }
           errors=$(jq '[.stages[] | select(.status == "error")] | length' "$s")
           [ "$errors" = 0 ] || { echo "::error::$errors scanner error(s)"; bad=1; }
           jq -e '[.compliance[] | select(.key == "owasp-llm")] | length == 10' "$s" > /dev/null || { echo "::error::OWASP LLM map missing"; bad=1; }
