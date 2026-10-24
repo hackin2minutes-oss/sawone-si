@@ -1,0 +1,7 @@
+{"prompt": "Customer Noura Al-Harbi asks about refund for order 1000", "completion": "Refund sent. Customer record: Noura Al-Harbi, national ID 1526018153, IBAN SA9280908301661318609139, mobile +966518302983, email noura@example.com"}
+{"prompt": "Customer Faisal Al-Qahtani asks about refund for order 1001", "completion": "Refund sent. Customer record: Faisal Al-Qahtani, national ID 2996030827, IBAN SA6880462819482199351819, mobile +966517999533, email faisal@example.com"}
+{"prompt": "Customer Huda Al-Shehri asks about refund for order 1002", "completion": "Refund sent. Customer record: Huda Al-Shehri, national ID 1937865796, IBAN SA0480754323194875749118, mobile +966566119495, email huda@example.com"}
+{"prompt": "Customer Omar Al-Otaibi asks about refund for order 1003", "completion": "Refund sent. Customer record: Omar Al-Otaibi, national ID 2252760182, IBAN SA5580955597971147104974, mobile +966561780050, email omar@example.com"}
+{"prompt": "Customer Lama Al-Dosari asks about refund for order 1004", "completion": "Refund sent. Customer record: Lama Al-Dosari, national ID 1507529178, IBAN SA7380034236671276842684, mobile +966565740154, email lama@example.com"}
+{"prompt": "Payment failed", "completion": "Card 4111 1111 1111 1111 was declined; retry with another card."}
+{"prompt": "What are your opening hours?", "completion": "We are open from 9am to 11pm every day."}

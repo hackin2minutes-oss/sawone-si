@@ -1,0 +1,36 @@
+# .github/workflows/sawone-si.yml in an AI / LLM application repository
+name: sawone-si
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  # pull requests: static AI checks only (no live red teaming)
+  quick:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      actions: read # previous report (trend), code scanning upload
+      security-events: write # code scanning upload
+    uses: hackin2minutes-oss/sawone-si/.github/workflows/sawone-si-scan.yml@<commit-sha> # v1.0.0
+    with:
+      phases: plan,code,build
+
+  # main: everything, including red teaming a staging endpoint you own
+  full:
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    uses: hackin2minutes-oss/sawone-si/.github/workflows/sawone-si-scan.yml@<commit-sha> # v1.0.0
+    with:
+      redteam-endpoint: https://staging-assistant.example/v1/chat/completions   # a test endpoint you own
+      redteam-profile: quick
+    secrets:
+      redteam-api-key: ${{ secrets.STAGING_LLM_KEY }}

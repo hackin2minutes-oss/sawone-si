@@ -1,0 +1,14 @@
+# zizmor policy for this repository's workflows and action.
+# Every action must be pinned to a full commit SHA (scripts/pin-actions.sh does it).
+# The one exception is the SLSA generator: its builder verifies its own tag at runtime
+# and refuses to run when called by SHA.
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        slsa-framework/slsa-github-generator/*: ref-pin
+        "*": hash-pin
+  # `uses: ./...` is the documented way to call this repository's own action/workflow;
+  # the newer `$/` syntax is not used so the files work on GitHub Enterprise Server too
+  self-repository:
+    disable: true

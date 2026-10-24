@@ -1,0 +1,162 @@
+# SawOne-SI: the Sawone engine, profiled for AI / LLM applications.
+brand: SawOne-SI
+report_title: "AI Application Security<br/>Assessment Report"
+report_title_ar: "تقرير تقييم<br/>أمن تطبيقات الذكاء الاصطناعي"
+semgrep_rules: [rules]
+compliance: defaults/ai-compliance.yml
+frameworks: [owasp-llm, owasp-ml, atlas, nist-ai-rmf, iso42001, sdaia-ai, asvs, ssdf, ecc, sama, pdpl]
+
+report_sections:
+  - {module: ai/report_section.py, after: compliance}
+
+evidence:
+  ai-threat-model: ["raw/**/ai-threats.json"]
+  ai-prompts: ["sarif/*ai-prompts*.sarif"]
+  ai-notebooks: ["sarif/*ai-notebooks*.sarif"]
+  ai-agents: ["sarif/*ai-agents*.sarif"]
+  ai-bom: ["raw/**/ai-bom.cdx.json", "raw/**/ai-inventory.json"]
+  ai-models: ["sarif/*ai-models*.sarif", "raw/**/ai-models.json"]
+  ai-data: ["sarif/*ai-data*.sarif", "raw/**/ai-data.json"]
+  ai-infra: ["sarif/*ai-infra*.sarif"]
+  ai-redteam: ["raw/**/redteam/*.jsonl", "raw/**/redteam/*.json", "sarif/*ai-redteam*.sarif"]
+  ai-guardrails: ["raw/**/ai-guardrails.json"]
+
+stages:
+  - id: ai-threat-model
+    phase: plan
+    after: threat-model
+    title: AI threat model
+    intro: >-
+      An automatic STRIDE-style view of the AI system this scan detected — models, prompts, retrieval sources,
+      tools and data stores — mapped to the OWASP LLM Top 10 and MITRE ATLAS, so design risks are named before
+      code is written.
+    title_ar: نمذجة تهديدات الذكاء الاصطناعي
+    intro_ar: >-
+      عرض تلقائي بأسلوب STRIDE لمنظومة الذكاء الاصطناعي المكتشفة — النماذج والأوامر ومصادر الاسترجاع والأدوات
+      ومخازن البيانات — مرتبطة بقائمة OWASP LLM العشر وإطار MITRE ATLAS، لتحديد مخاطر التصميم قبل كتابة الشيفرة.
+  - id: ai-prompts
+    phase: code
+    after: sast
+    title: Prompts and system prompts
+    intro: >-
+      Prompt and system-prompt files: secrets written into them, internal endpoints they reveal, and override or
+      backdoor phrases that weaken the model's instructions.
+    title_ar: الأوامر وأوامر النظام
+    intro_ar: >-
+      ملفات الأوامر وأوامر النظام: الأسرار المكتوبة فيها، ونقاط الاتصال الداخلية التي تكشفها، وعبارات التجاوز أو
+      الأبواب الخلفية التي تضعف تعليمات النموذج.
+  - id: ai-notebooks
+    phase: code
+    after: ai-prompts
+    title: Notebooks
+    intro: >-
+      Jupyter notebooks: secrets in cells, personal data or tokens left in saved outputs, unsafe model and data
+      loading, and unpinned package installs.
+    title_ar: دفاتر العمل
+    intro_ar: >-
+      دفاتر Jupyter: الأسرار في الخلايا، والبيانات الشخصية أو الرموز المتبقية في المخرجات المحفوظة، وتحميل النماذج
+      والبيانات بطريقة غير آمنة، وتثبيت الحزم دون تثبيت الإصدار.
+  - id: ai-agents
+    phase: code
+    after: ai-notebooks
+    title: Agents and MCP
+    intro: >-
+      Agent and Model Context Protocol configuration: tools that run code or shell commands, filesystem servers
+      rooted too broadly, unpinned MCP servers, inline tokens and plain-HTTP remote servers.
+    title_ar: الوكلاء وبروتوكول MCP
+    intro_ar: >-
+      إعدادات الوكلاء وبروتوكول MCP: الأدوات التي تنفّذ الشيفرة أو أوامر الصدفة، وخوادم الملفات ذات الجذور الواسعة،
+      وخوادم MCP غير المثبّتة، والرموز المضمّنة، والخوادم البعيدة عبر HTTP غير المشفّر.
+  - id: ai-bom
+    phase: build
+    after: sca
+    title: AI bill of materials
+    intro: >-
+      An inventory of the AI the project uses — model files, model providers, frameworks, vector stores, datasets
+      and prompts — as a CycloneDX ML-BOM, with provenance notes for each model.
+    title_ar: قائمة مكوّنات الذكاء الاصطناعي
+    intro_ar: >-
+      جرد لمكوّنات الذكاء الاصطناعي في المشروع — ملفات النماذج ومزوّدوها وأطر العمل ومخازن المتجهات ومجموعات
+      البيانات والأوامر — بصيغة CycloneDX ML-BOM، مع ملاحظات المصدر لكل نموذج.
+  - id: ai-models
+    phase: build
+    after: ai-bom
+    title: Model files
+    intro: >-
+      Every model file, examined as data and never loaded: pickles and PyTorch checkpoints that would run code,
+      NumPy object arrays, Keras Lambda layers, GGUF chat-template escapes — against the safe formats.
+    title_ar: ملفات النماذج
+    intro_ar: >-
+      كل ملف نموذج، يُفحَص كبيانات ولا يُحمَّل أبداً: ملفات pickle ونقاط حفظ PyTorch التي قد تنفّذ شيفرة، ومصفوفات
+      NumPy الكائنية، وطبقات Keras Lambda، وثغرات قوالب GGUF — مقابل الصيغ الآمنة.
+  - id: ai-data
+    phase: build
+    after: ai-models
+    title: Training and RAG data
+    intro: >-
+      Training sets and retrieval documents: personal data (Saudi national IDs, IBANs, cards, contact details)
+      that raises PDPL and disclosure risk, and documents carrying instructions hidden from a reader
+      (indirect prompt injection and data poisoning).
+    title_ar: بيانات التدريب والاسترجاع
+    intro_ar: >-
+      مجموعات التدريب ووثائق الاسترجاع: البيانات الشخصية (الهويات الوطنية السعودية وأرقام الآيبان والبطاقات
+      وبيانات التواصل) التي ترفع مخاطر نظام حماية البيانات والكشف، والوثائق التي تحمل تعليمات مخفية عن القارئ.
+  - id: ai-infra
+    phase: build
+    after: iac
+    title: AI infrastructure
+    intro: >-
+      AI cloud services in infrastructure code — Azure OpenAI and ML, Bedrock, SageMaker, Vertex AI — checked for
+      public network access, key-only authentication, missing content filters and guardrails, and missing
+      encryption or logging.
+    title_ar: البنية التحتية للذكاء الاصطناعي
+    intro_ar: >-
+      خدمات الذكاء الاصطناعي السحابية في شيفرة البنية التحتية — Azure OpenAI وML وBedrock وSageMaker وVertex AI —
+      من حيث الوصول العام للشبكة، والمصادقة بالمفاتيح فقط، وغياب مرشّحات المحتوى والضوابط، وغياب التشفير والتسجيل.
+  - id: ai-redteam
+    phase: test
+    after: dast
+    title: LLM red teaming
+    intro: >-
+      A live attack on the language-model endpoint you configured, run with garak and promptfoo: prompt
+      injection, system-prompt and data leakage, insecure output, excessive agency and jailbreaks. Opt-in; with
+      no endpoint it is reported as not configured.
+    title_ar: الاختبار الهجومي للنموذج اللغوي
+    intro_ar: >-
+      هجوم مباشر على نقطة اتصال النموذج اللغوي التي تحددها، باستخدام garak وpromptfoo: حقن الأوامر، وتسريب أمر
+      النظام والبيانات، ومعالجة المخرجات غير الآمنة، والوكالة المفرطة، وكسر القيود. اختياري؛ ويُبلَّغ عن عدم ضبطه.
+  - id: ai-guardrails
+    phase: operate
+    after: runtime
+    title: Guardrails and abuse controls
+    intro: >-
+      Whether the application has runtime safeguards — input/output guardrails, a moderation or content-safety
+      check, rate and token limits, and observability of prompts — that keep working after release.
+    title_ar: الضوابط ومكافحة إساءة الاستخدام
+    intro_ar: >-
+      ما إذا كان التطبيق يملك وقايات تشغيلية — ضوابط للمدخلات والمخرجات، وفحص إشراف أو أمان للمحتوى، وحدوداً
+      للمعدّل والرموز، ومراقبة للأوامر — تستمر في العمل بعد الإصدار.
+
+phase_intros:
+  plan: "Design-time AI security: the threat model of the AI system and the risk decisions taken on it."
+  test: "The AI system under test: the built application attacked from outside, and the language-model endpoint red-teamed."
+  operate: "Protection in production: guardrails, moderation, rate and token limits, and prompt observability live on in the running service."
+  monitor: "After release: vulnerability tracking, and monitoring of model inputs, outputs, cost and abuse."
+phase_intros_ar:
+  plan: "أمن الذكاء الاصطناعي في مرحلة التصميم: نمذجة تهديدات المنظومة وقرارات المخاطر المتخذة بشأنها."
+  test: "منظومة الذكاء الاصطناعي قيد الاختبار: التطبيق المبني يُهاجَم من الخارج، ونقطة اتصال النموذج اللغوي تُختبَر هجومياً."
+  operate: "الحماية في الإنتاج: الضوابط والإشراف وحدود المعدّل والرموز ومراقبة الأوامر تستمر في الخدمة العاملة."
+  monitor: "بعد الإصدار: تتبّع الثغرات، ومراقبة مدخلات النموذج ومخرجاته وتكلفته وإساءة استخدامه."
+elsewhere:
+  deploy: "your deployment pipeline (model gateway, approvals)"
+  monitor: "LLM observability and abuse monitoring"
+lifecycle_note: >-
+  Plan, code, build and test run in this scan; release is the gate decision; deploy, operate and monitor happen
+  in your model gateway and observability stack, which the report points to.
+translations:
+  "Plan, code, build and test run in this scan; release is the gate decision; deploy, operate and monitor happen in your model gateway and observability stack, which the report points to.": >-
+    تُنفَّذ مراحل التخطيط والبرمجة والبناء والاختبار في هذا الفحص؛ والإصدار هو قرار البوابة؛ أما النشر والتشغيل
+    والمراقبة فتتم في بوابة النموذج ومنظومة المراقبة التي يشير إليها التقرير.
+  "your deployment pipeline (model gateway, approvals)": "خط النشر لديك (بوابة النموذج والموافقات)"
+  "LLM observability and abuse monitoring": "مراقبة النموذج اللغوي وإساءة الاستخدام"
+  "AI Application Security<br/>Assessment Report": "تقرير تقييم<br/>أمن تطبيقات الذكاء الاصطناعي"

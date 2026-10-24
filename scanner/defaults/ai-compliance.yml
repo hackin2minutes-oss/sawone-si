@@ -1,0 +1,91 @@
+# AI security and governance frameworks: which SawOne-SI stage produces evidence for which control.
+# Controls that a static pipeline scan cannot show (human oversight, governance, impact assessments, runtime
+# monitoring) map to no stage and are reported "not assessed": an evidence map, never a compliance claim.
+frameworks:
+  owasp-llm: OWASP LLM Top 10 (2025)
+  owasp-ml: OWASP Machine Learning Top 10
+  atlas: MITRE ATLAS
+  nist-ai-rmf: NIST AI RMF (incl. GenAI profile AI 600-1)
+  iso42001: ISO/IEC 42001
+  sdaia-ai: SDAIA AI Ethics Principles (KSA)
+controls:
+  # ------------------------------------------------------------ OWASP LLM Top 10 (2025)
+  - {framework: owasp-llm, id: LLM01, title: "Prompt injection", title_ar: "حقن الأوامر",
+     stages: [sast, ai-prompts, ai-data, ai-redteam]}
+  - {framework: owasp-llm, id: LLM02, title: "Sensitive information disclosure", title_ar: "كشف المعلومات الحساسة",
+     stages: [sast, secrets, ai-data, ai-prompts, ai-notebooks, ai-redteam]}
+  - {framework: owasp-llm, id: LLM03, title: "Supply chain", title_ar: "سلسلة الإمداد",
+     stages: [ai-bom, ai-models, sca]}
+  - {framework: owasp-llm, id: LLM04, title: "Data and model poisoning", title_ar: "تسميم البيانات والنماذج",
+     stages: [ai-data, ai-models, ai-bom]}
+  - {framework: owasp-llm, id: LLM05, title: "Improper output handling", title_ar: "سوء معالجة المخرجات",
+     stages: [sast, ai-redteam]}
+  - {framework: owasp-llm, id: LLM06, title: "Excessive agency", title_ar: "الوكالة المفرطة",
+     stages: [sast, ai-agents, ai-redteam]}
+  - {framework: owasp-llm, id: LLM07, title: "System prompt leakage", title_ar: "تسريب أمر النظام",
+     stages: [ai-prompts, ai-redteam]}
+  - {framework: owasp-llm, id: LLM08, title: "Vector and embedding weaknesses", title_ar: "ضعف المتجهات والتضمين",
+     stages: [ai-data, sast]}
+  - {framework: owasp-llm, id: LLM09, title: "Misinformation", title_ar: "التضليل",
+     stages: [ai-redteam]}
+  - {framework: owasp-llm, id: LLM10, title: "Unbounded consumption", title_ar: "الاستهلاك غير المحدود",
+     stages: [sast, ai-infra]}
+  # ------------------------------------------------------------ OWASP ML Top 10 (the data/model-centric risks)
+  - {framework: owasp-ml, id: ML01, title: "Input manipulation (adversarial)", title_ar: "التلاعب بالمدخلات",
+     stages: [ai-redteam]}
+  - {framework: owasp-ml, id: ML02, title: "Data poisoning", title_ar: "تسميم البيانات", stages: [ai-data, ai-bom]}
+  - {framework: owasp-ml, id: ML03, title: "Model inversion", title_ar: "عكس النموذج", stages: [ai-redteam]}
+  - {framework: owasp-ml, id: ML04, title: "Membership inference", title_ar: "استدلال العضوية", stages: [ai-data]}
+  - {framework: owasp-ml, id: ML05, title: "Model theft", title_ar: "سرقة النموذج", stages: [ai-infra, secrets]}
+  - {framework: owasp-ml, id: ML06, title: "Corrupted / unsafe model package", title_ar: "حزمة نموذج غير آمنة",
+     stages: [ai-models, ai-bom]}
+  - {framework: owasp-ml, id: ML08, title: "Model skewing / supply chain", title_ar: "انحراف النموذج",
+     stages: [ai-models, ai-bom, sca]}
+  # ------------------------------------------------------------ MITRE ATLAS (technique groups the scan evidences)
+  - {framework: atlas, id: "AML.T0010", title: "ML supply-chain compromise", title_ar: "اختراق سلسلة إمداد التعلم الآلي",
+     stages: [ai-models, ai-bom, sca]}
+  - {framework: atlas, id: "AML.T0051", title: "LLM prompt injection", title_ar: "حقن أوامر النموذج اللغوي",
+     stages: [sast, ai-prompts, ai-data, ai-redteam]}
+  - {framework: atlas, id: "AML.T0054", title: "LLM jailbreak", title_ar: "كسر قيود النموذج اللغوي",
+     stages: [ai-redteam]}
+  - {framework: atlas, id: "AML.T0057", title: "LLM data leakage", title_ar: "تسرب بيانات النموذج اللغوي",
+     stages: [ai-redteam, ai-data, ai-prompts]}
+  - {framework: atlas, id: "AML.T0024", title: "Exfiltration via ML inference API", title_ar: "التسريب عبر واجهة الاستدلال",
+     stages: [ai-redteam, ai-infra]}
+  - {framework: atlas, id: "AML.T0049", title: "Exploit public-facing application", title_ar: "استغلال تطبيق عام",
+     stages: [sast, dast]}
+  # ------------------------------------------------------------ NIST AI RMF + GenAI profile (AI 600-1)
+  - {framework: nist-ai-rmf, id: "MANAGE-2.2", title: "Mechanisms to mitigate AI risks are applied",
+     title_ar: "تطبيق آليات للحد من مخاطر الذكاء الاصطناعي", stages: [sast, ai-models, ai-infra, ai-redteam]}
+  - {framework: nist-ai-rmf, id: "MEASURE-2.6", title: "AI system is evaluated for safety risks",
+     title_ar: "تقييم النظام لمخاطر السلامة", stages: [ai-redteam]}
+  - {framework: nist-ai-rmf, id: "MEASURE-2.7", title: "Security and resilience are evaluated (red-teaming)",
+     title_ar: "تقييم الأمن والمرونة", stages: [ai-redteam, sast]}
+  - {framework: nist-ai-rmf, id: "MEASURE-2.10", title: "Privacy risk of training data is assessed",
+     title_ar: "تقييم مخاطر خصوصية بيانات التدريب", stages: [ai-data]}
+  - {framework: nist-ai-rmf, id: "MAP-4.1", title: "Third-party / supply-chain AI risks are mapped",
+     title_ar: "حصر مخاطر الطرف الثالث", stages: [ai-bom, ai-models, sca]}
+  - {framework: nist-ai-rmf, id: "GOVERN-1.2", title: "Trustworthy-AI characteristics are integrated",
+     title_ar: "دمج خصائص الذكاء الاصطناعي الموثوق", stages: []}
+  # ------------------------------------------------------------ ISO/IEC 42001 (AI management system)
+  - {framework: iso42001, id: "A.6.2.4", title: "AI system verification and validation",
+     title_ar: "التحقق من نظام الذكاء الاصطناعي والتثبت منه", stages: [ai-redteam, sast]}
+  - {framework: iso42001, id: "A.7.4", title: "Quality and provenance of training data",
+     title_ar: "جودة بيانات التدريب ومصدرها", stages: [ai-data, ai-bom]}
+  - {framework: iso42001, id: "A.8.3", title: "AI system and data resources are documented",
+     title_ar: "توثيق موارد النظام والبيانات", stages: [ai-bom]}
+  - {framework: iso42001, id: "A.10.4", title: "Secure development of AI systems",
+     title_ar: "التطوير الآمن لأنظمة الذكاء الاصطناعي", stages: [sast, ai-models, secrets]}
+  - {framework: iso42001, id: "A.9.2", title: "Responsible-use and safeguard controls",
+     title_ar: "ضوابط الاستخدام المسؤول", stages: [ai-infra, ai-guardrails]}
+  # ------------------------------------------------------------ SDAIA AI Ethics Principles (KSA)
+  - {framework: sdaia-ai, id: "SDAIA-PRIV", title: "Privacy and data protection (PDPL alignment)",
+     title_ar: "الخصوصية وحماية البيانات", stages: [ai-data, secrets]}
+  - {framework: sdaia-ai, id: "SDAIA-SAFE", title: "Reliability and safety",
+     title_ar: "الموثوقية والسلامة", stages: [ai-redteam, ai-models]}
+  - {framework: sdaia-ai, id: "SDAIA-SEC", title: "Security of the AI system",
+     title_ar: "أمن نظام الذكاء الاصطناعي", stages: [sast, ai-infra, ai-redteam, ai-models]}
+  - {framework: sdaia-ai, id: "SDAIA-ACC", title: "Accountability and human oversight",
+     title_ar: "المساءلة والرقابة البشرية", stages: [ai-guardrails]}
+  - {framework: sdaia-ai, id: "SDAIA-FAIR", title: "Fairness and non-discrimination",
+     title_ar: "العدالة وعدم التمييز", stages: []}

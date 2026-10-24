@@ -1,0 +1,310 @@
+# SawOne-SI AI rule pack for Semgrep (Python and JavaScript/TypeScript).
+# Each rule names the OWASP LLM Top 10 (2025) risk and a CWE. ERROR blocks at the default gate (HIGH);
+# WARNING and INFO are tracked. Rules avoid test files.
+rules:
+  # ================================================================ LLM05: insecure output handling
+  - id: sawone-ai-llm-output-to-exec
+    languages: [python]
+    severity: ERROR
+    message: >-
+      The text a language model returns is passed to exec()/eval(). A model can be steered by its input to emit
+      any code, so this is remote code execution. Never execute model output; if code must be produced, run it
+      in a locked-down sandbox with no host or network access.
+    mode: taint
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: $RESP.choices[0].message.content
+              - pattern: $RESP.choices[0].text
+              - pattern: $RESP.content[0].text
+              - pattern: $LLM.predict(...)
+              - pattern: $LLM.invoke(...)
+              - pattern: $CHAIN.run(...)
+              - pattern: $RESP.output_text
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: exec(...)
+              - pattern: eval(...)
+    paths: {exclude: ['*_test.py', '*/tests/*', 'test_*.py']}
+    metadata: {cwe: ["CWE-94: Improper Control of Generation of Code"], owasp: LLM05, category: security}
+
+  - id: sawone-ai-llm-output-to-shell
+    languages: [python]
+    severity: ERROR
+    message: >-
+      Model output is used to build a shell command (os.system / subprocess with shell=True). Prompt injection
+      becomes command execution. Do not run model output as a command; map it to a fixed allow-list of actions.
+    mode: taint
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: $RESP.choices[0].message.content
+              - pattern: $RESP.choices[0].text
+              - pattern: $RESP.content[0].text
+              - pattern: $LLM.predict(...)
+              - pattern: $LLM.invoke(...)
+              - pattern: $CHAIN.run(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: os.system(...)
+              - pattern: os.popen(...)
+              - pattern: subprocess.run(...)
+              - pattern: subprocess.Popen(...)
+              - pattern: subprocess.call(...)
+              - pattern: subprocess.check_output(...)
+    paths: {exclude: ['*_test.py', '*/tests/*', 'test_*.py']}
+    metadata: {cwe: ["CWE-78: OS Command Injection"], owasp: LLM05, category: security}
+
+  - id: sawone-ai-llm-output-to-sql
+    languages: [python]
+    severity: ERROR
+    message: >-
+      Model output is executed as a database query. A model can be steered to emit destructive or exfiltrating
+      SQL. Use parameterised queries over fixed statements; never run a query a model wrote.
+    mode: taint
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: $RESP.choices[0].message.content
+              - pattern: $LLM.invoke(...)
+              - pattern: $LLM.predict(...)
+              - pattern: $CHAIN.run(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $DB.execute(...)
+              - pattern: $CUR.execute(...)
+              - pattern: $DB.executescript(...)
+    paths: {exclude: ['*_test.py', '*/tests/*', 'test_*.py']}
+    metadata: {cwe: ["CWE-89: SQL Injection"], owasp: LLM05, category: security}
+
+  - id: sawone-ai-llm-output-dangerous-html-js
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      Model output is rendered as raw HTML (dangerouslySetInnerHTML / innerHTML) or evaluated. Model text can
+      carry script or a markdown image that exfiltrates data. Render it as text, or sanitise it first.
+    patterns:
+      - pattern-either:
+          - pattern: "<$EL dangerouslySetInnerHTML={{__html: $X}} />"
+          - pattern: "$EL.innerHTML = $X"
+          - pattern: eval($X)
+      - metavariable-pattern:
+          metavariable: $X
+          patterns:
+            - pattern-either:
+                - pattern: $RESP.choices[0].message.content
+                - pattern: $RESP.choices[...].message.content
+                - pattern: $C.content
+                - pattern: $ANS
+                - pattern: $COMPLETION
+    paths: {exclude: ['*.test.*', '*/tests/*', '*.spec.*']}
+    metadata: {cwe: ["CWE-79: Cross-site Scripting"], owasp: LLM05, category: security}
+
+  # ================================================================ LLM01: prompt injection
+  - id: sawone-ai-user-input-in-system-prompt
+    languages: [python]
+    severity: WARNING
+    message: >-
+      User-controlled text is interpolated into the system prompt. Content in the system role is trusted by the
+      model, so this lets a user rewrite its instructions (prompt injection). Keep user text in a user-role
+      message and keep the system prompt a constant.
+    patterns:
+      - pattern-either:
+          - pattern: '{"role": "system", "content": f"...{$X}..."}'
+          - pattern: '{"role": "system", "content": $A + $X}'
+          - pattern: SystemMessage(content=f"...{$X}...")
+          - pattern: SystemMessage(f"...{$X}...")
+    paths: {exclude: ['*_test.py', '*/tests/*', 'test_*.py']}
+    metadata: {cwe: ["CWE-77: Command/Argument Injection"], owasp: LLM01, category: security}
+
+  # ================================================================ LLM02: sensitive information disclosure
+  - id: sawone-ai-prompt-logged
+    languages: [python]
+    severity: WARNING
+    message: >-
+      A prompt or model message is written to the application log. Prompts and completions often carry personal
+      data and secrets, and logs are widely readable and retained. Log a redacted summary instead.
+    patterns:
+      - pattern-either:
+          - pattern: '$LOG.info(f"...{$P}...")'
+          - pattern: '$LOG.debug(f"...{$P}...")'
+          - pattern: '$LOG.info($P)'
+          - pattern: '$LOG.debug($P)'
+          - pattern: $LOG.info($FMT, $P)
+      - metavariable-regex:
+          metavariable: $P
+          regex: (?i).*(prompt|message|completion|question|user_input|query).*
+    paths: {exclude: ['*_test.py', '*/tests/*', 'test_*.py']}
+    metadata: {cwe: ["CWE-532: Insertion of Sensitive Information into Log File"], owasp: LLM02, category: security}
+
+  # ================================================================ LLM03 / supply chain: unsafe model loading
+  - id: sawone-ai-torch-load-unsafe
+    languages: [python]
+    severity: ERROR
+    message: >-
+      torch.load without weights_only=True unpickles the checkpoint, running any code it carries. Pass
+      weights_only=True (PyTorch 2.6+ default), or load safetensors instead.
+    patterns:
+      - pattern: torch.load(...)
+      - pattern-not: torch.load(..., weights_only=True)
+    paths: {exclude: ['*_test.py', '*/tests/*', 'test_*.py']}
+    metadata: {cwe: ["CWE-502: Deserialization of Untrusted Data"], owasp: LLM03, category: security}
+
+  - id: sawone-ai-pickle-model-load
+    languages: [python]
+    severity: ERROR
+    message: >-
+      pickle / joblib / np.load(allow_pickle=True) runs code while loading. Only load a model file you produced,
+      and prefer a safe format (safetensors, ONNX) for anything from outside.
+    pattern-either:
+      - pattern: pickle.load(...)
+      - pattern: pickle.loads(...)
+      - pattern: joblib.load(...)
+      - pattern: numpy.load(..., allow_pickle=True)
+      - pattern: np.load(..., allow_pickle=True)
+    paths: {exclude: ['*_test.py', '*/tests/*', 'test_*.py']}
+    metadata: {cwe: ["CWE-502: Deserialization of Untrusted Data"], owasp: LLM03, category: security}
+
+  - id: sawone-ai-keras-unsafe-mode
+    languages: [python]
+    severity: ERROR
+    message: >-
+      keras.models.load_model(..., safe_mode=False) allows Lambda layers, which carry arbitrary Python. Keep
+      safe_mode at its default (True) unless you built the file yourself.
+    pattern: $K.models.load_model(..., safe_mode=False)
+    paths: {exclude: ['*_test.py', '*/tests/*', 'test_*.py']}
+    metadata: {cwe: ["CWE-502: Deserialization of Untrusted Data"], owasp: LLM03, category: security}
+
+  - id: sawone-ai-trust-remote-code
+    languages: [python]
+    severity: ERROR
+    message: >-
+      trust_remote_code=True runs Python published alongside the model on the Hugging Face Hub, on every load.
+      A later push to that repo changes what runs. Avoid it, or pin a revision and vet the code.
+    pattern-regex: 'trust_remote_code\s*=\s*True'
+    paths: {exclude: ['*_test.py', '*/tests/*', 'test_*.py']}
+    metadata: {cwe: ["CWE-494: Download of Code Without Integrity Check"], owasp: LLM03, category: security}
+
+  - id: sawone-ai-hf-download-unpinned
+    languages: [python]
+    severity: WARNING
+    message: >-
+      A model or file is pulled from the Hugging Face Hub without a pinned revision. The repo can change under
+      you (a supply-chain risk). Pass revision="<commit sha>" so the same bytes load every time.
+    patterns:
+      - pattern-either:
+          - pattern: from_pretrained($REPO, ...)
+          - pattern: from_pretrained($REPO)
+          - pattern: hf_hub_download(...)
+          - pattern: snapshot_download(...)
+      - pattern-not: from_pretrained(..., revision=$REV, ...)
+      - pattern-not: hf_hub_download(..., revision=$REV, ...)
+      - pattern-not: snapshot_download(..., revision=$REV, ...)
+      - pattern-not: $OBJ.from_pretrained($LOCALVAR)
+    paths: {exclude: ['*_test.py', '*/tests/*', 'test_*.py']}
+    metadata: {cwe: ["CWE-494: Download of Code Without Integrity Check"], owasp: LLM03, category: security}
+
+  - id: sawone-ai-faiss-dangerous-deserialization
+    languages: [python]
+    severity: ERROR
+    message: >-
+      FAISS.load_local(..., allow_dangerous_deserialization=True) unpickles the index. Loading one from an
+      untrusted source runs code. Rebuild the index locally, or only load one you created.
+    pattern-regex: 'allow_dangerous_deserialization\s*=\s*True'
+    paths: {exclude: ['*_test.py', '*/tests/*', 'test_*.py']}
+    metadata: {cwe: ["CWE-502: Deserialization of Untrusted Data"], owasp: LLM03, category: security}
+
+  - id: sawone-ai-unsafe-yaml-load
+    languages: [python]
+    severity: ERROR
+    message: >-
+      yaml.load with the full Loader constructs arbitrary Python objects. Model and pipeline configs are often
+      loaded this way. Use yaml.safe_load.
+    patterns:
+      - pattern: yaml.load(...)
+      - pattern-not: yaml.load(..., Loader=yaml.SafeLoader)
+      - pattern-not: yaml.load(..., Loader=yaml.BaseLoader)
+    paths: {exclude: ['*_test.py', '*/tests/*', 'test_*.py']}
+    metadata: {cwe: ["CWE-502: Deserialization of Untrusted Data"], owasp: LLM03, category: security}
+
+  # ================================================================ LLM06: excessive agency
+  - id: sawone-ai-dangerous-agent-tools
+    languages: [python]
+    severity: ERROR
+    message: >-
+      An agent is given a tool that runs arbitrary code or shell commands (Python REPL, shell tool, or
+      allow_dangerous_tools / allow_dangerous_code). With prompt injection the model runs that code. Remove the
+      tool, or run it in an isolated sandbox with least privilege and human approval for actions.
+    pattern-either:
+      - pattern: PythonREPLTool(...)
+      - pattern: PythonAstREPLTool(...)
+      - pattern: ShellTool(...)
+      - pattern-regex: 'allow_dangerous_tools\s*=\s*True'
+      - pattern-regex: 'allow_dangerous_code\s*=\s*True'
+      - pattern-regex: 'code_execution_mode\s*[:=]\s*["'']?unsafe'
+    paths: {exclude: ['*_test.py', '*/tests/*', 'test_*.py']}
+    metadata: {cwe: ["CWE-250: Execution with Unnecessary Privileges"], owasp: LLM06, category: security}
+
+  - id: sawone-ai-langchain-math-rce
+    languages: [python]
+    severity: WARNING
+    message: >-
+      LLMMathChain evaluated model output with Python in versions before 0.0.236 (CVE-2023-29374). Use
+      numexpr-backed math, and keep LangChain up to date.
+    pattern-either:
+      - pattern: LLMMathChain.from_llm(...)
+      - pattern: LLMMathChain(...)
+    paths: {exclude: ['*_test.py', '*/tests/*', 'test_*.py']}
+    metadata: {cwe: ["CWE-94: Improper Control of Generation of Code"], owasp: LLM06, category: security}
+
+  # ================================================================ LLM02 / secrets: keys in client code
+  - id: sawone-ai-api-key-in-browser
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      An LLM client is created with dangerouslyAllowBrowser, so the provider API key ships to the user's browser
+      where anyone can read it. Call the model from a server route and keep the key on the server.
+    pattern-regex: 'dangerouslyAllowBrowser\s*:\s*true'
+    paths: {exclude: ['*.test.*', '*/tests/*', '*.spec.*']}
+    metadata: {cwe: ["CWE-312: Cleartext Storage of Sensitive Information"], owasp: LLM02, category: security}
+
+  - id: sawone-ai-public-key-env-in-client
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      A model provider key is read from a NEXT_PUBLIC_/VITE_/REACT_APP_ variable, which is inlined into the
+      browser bundle and visible to every visitor. Keep provider keys in server-only variables.
+    pattern-regex: '(NEXT_PUBLIC_|VITE_|REACT_APP_)[A-Z_]*(OPENAI|ANTHROPIC|API_KEY|LLM|GEMINI|GROQ|MISTRAL)[A-Z_]*'
+    paths: {exclude: ['*.test.*', '*/tests/*', '*.spec.*']}
+    metadata: {cwe: ["CWE-312: Cleartext Storage of Sensitive Information"], owasp: LLM02, category: security}
+
+  # ================================================================ LLM10: unbounded consumption
+  - id: sawone-ai-no-max-tokens
+    languages: [python]
+    severity: INFO
+    message: >-
+      A chat completion is created without max_tokens. An attacker can drive long, expensive generations (a
+      denial-of-wallet risk). Set a max_tokens ceiling.
+    patterns:
+      - pattern-either:
+          - pattern: $C.chat.completions.create(...)
+          - pattern: $C.messages.create(...)
+      - pattern-not: $C.chat.completions.create(..., max_tokens=$N, ...)
+      - pattern-not: $C.messages.create(..., max_tokens=$N, ...)
+      - pattern-not: $C.chat.completions.create(..., max_completion_tokens=$N, ...)
+    paths: {exclude: ['*_test.py', '*/tests/*', 'test_*.py']}
+    metadata: {cwe: ["CWE-770: Allocation of Resources Without Limits"], owasp: LLM10, category: security}
+
+  # ================================================================ serving: public share
+  - id: sawone-ai-gradio-public-share
+    languages: [python]
+    severity: WARNING
+    message: >-
+      Gradio launch(share=True) opens a public tunnel to the app, often with no authentication. Anyone with the
+      link reaches the model. Use share=False and put authentication in front of it.
+    pattern-regex: '\.launch\s*\([^)]*share\s*=\s*True'
+    paths: {exclude: ['*_test.py', '*/tests/*', 'test_*.py']}
+    metadata: {cwe: ["CWE-284: Improper Access Control"], owasp: LLM02, category: security}

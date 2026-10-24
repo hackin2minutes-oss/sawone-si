@@ -1,0 +1,26 @@
+# Local AI stack (deliberately vulnerable: see README.md)
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+  ollama:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: 0.0.0.0           # planted: no authentication, published on every interface
+    ports: ["11434:11434"]
+  ray:
+    image: rayproject/ray:2.9.0
+    command: ray start --head --dashboard-host=0.0.0.0 --block    # planted: ShadowRay (CVE-2023-48022)
+    ports: ["8265:8265"]
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.8.0
+    command: mlflow server --host 0.0.0.0 --port 5000               # planted: no authentication
+    ports: ["5000:5000"]
+  notebook:
+    image: quay.io/jupyter/base-notebook:latest
+    command: start-notebook.py --NotebookApp.token='' --NotebookApp.password=''   # planted: open Jupyter
+    ports: ["8888:8888"]
+  vllm:
+    image: vllm/vllm-openai:v0.6.0
+    command: --model acme-ai/support-7b --host 0.0.0.0              # planted: no --api-key
+    ports: ["8001:8000"]

@@ -1,0 +1,5 @@
+# SawOne-SI settings for the fixture. The red-team stage is opt-in and needs an endpoint you own:
+# see the README of SawOne-SI. The fixture has none, so that stage reports "not configured".
+ai:
+  guardrails:
+    required: []

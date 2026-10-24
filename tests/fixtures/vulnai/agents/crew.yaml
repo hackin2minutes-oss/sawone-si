@@ -1,0 +1,8 @@
+# CrewAI agents (deliberately vulnerable: see README.md)
+analyst:
+  role: Data analyst
+  goal: Answer questions about sales with Python
+  allow_code_execution: true
+  code_execution_mode: unsafe        # planted: runs generated code on the host, not in a container
+  allow_delegation: true
+  max_iter: 50
