@@ -339,6 +339,30 @@ def ai_bom(ai):
 # register the red-team image so Scan.docker() can find it under the "_redteam" tool key
 ds.IMAGES["_redteam"] = REDTEAM_IMAGE
 
+_orig_resolve_lock = ds.resolve_lock
+
+
+def _resolve_lock_wrapper(out_path):
+    # Only lock _redteam if it is resolvable on the registry; before the first release,
+    # the companion image has not been pushed yet and must not block the scanner lock.
+    redteam = ds.IMAGES.pop("_redteam", None)
+    if redteam:
+        try:
+            p = subprocess.run(["docker", "buildx", "imagetools", "inspect", redteam, "--format", "{{json .Manifest}}"],
+                               capture_output=True, text=True, timeout=30)
+            if p.returncode == 0 and "sha256:" in p.stdout:
+                ds.IMAGES["_redteam"] = redteam
+        except Exception:
+            pass
+    try:
+        return _orig_resolve_lock(out_path)
+    finally:
+        if redteam:
+            ds.IMAGES["_redteam"] = redteam
+
+
+ds.resolve_lock = _resolve_lock_wrapper
+
 
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "--version":
