@@ -158,17 +158,17 @@ jobs:
       cache-key: ${{ steps.cachekey.outputs.key }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: inputs.scanner-source-path != ''
+        if: "inputs.scanner-source-path != ''"
         with: { persist-credentials: false }
-#       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-#         if: inputs.engine-ref != ''
-#         with:
-#           repository: hackin2minutes-oss/sawone
-#           ref: ${{ inputs.engine-ref }}
-#           path: .sawone-engine
-#           persist-credentials: false
+      # - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      #   if: inputs.engine-ref != ''
+      #   with:
+      #     repository: hackin2minutes-oss/sawone
+      #     ref: ${{ inputs.engine-ref }}
+      #     path: .sawone-engine
+      #     persist-credentials: false
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-        if: inputs.scanner-source-path == '' && inputs.scanner-identity-regexp != ''
+        if: "inputs.scanner-source-path == '' && inputs.scanner-identity-regexp != ''"
       - name: Resolve the scanner image to a digest
         id: scanner
         env:
@@ -181,10 +181,10 @@ jobs:
           out="$RUNNER_TEMP/sawone-tools"; mkdir -p "$out"
           if [ -n "$SCANNER_SRC" ]; then
             base_args=()
-#            if [ -n "$ENGINE_REF" ]; then
-#              docker build --pull -t "sawone-engine:run-$GITHUB_RUN_ID" "$GITHUB_WORKSPACE/.sawone-engine/scanner"
-#              base_args=(--build-arg "SAWONE_IMAGE=sawone-engine:run-$GITHUB_RUN_ID")
-#            fi
+            # if [ -n "$ENGINE_REF" ]; then
+            #   docker build --pull -t "sawone-engine:run-$GITHUB_RUN_ID" "$GITHUB_WORKSPACE/.sawone-engine/scanner"
+            #   base_args=(--build-arg "SAWONE_IMAGE=sawone-engine:run-$GITHUB_RUN_ID")
+            # fi
             ref="sawone-si-scanner:run-$GITHUB_RUN_ID"
             docker build "${base_args[@]}" -t "$ref" "$GITHUB_WORKSPACE/$SCANNER_SRC"
             docker save -o "$out/scanner.tar" "$ref"
@@ -253,7 +253,7 @@ jobs:
   gates:
     name: ${{ fromJSON('{"ai-threat-model":"Plan","secrets":"Code","sast":"Code","ai-prompts":"Code","ai-notebooks":"Code","ai-agents":"Code","sca":"Build","ai-bom":"Build","ai-models":"Build","ai-data":"Build","iac":"Build","ai-infra":"Build","cicd":"Build","ai-guardrails":"Operate"}')[matrix.stage] }} · ${{ matrix.stage }}
     needs: [validate, tools]
-    if: needs.validate.outputs.gate-stages != '[]'
+    if: "needs.validate.outputs.gate-stages != '[]'"
     runs-on: ${{ inputs.runs-on }}
     permissions: { contents: read }
     strategy:
@@ -273,7 +273,7 @@ jobs:
           key: ${{ needs.tools.outputs.cache-key }}
           restore-keys: sawone-si-vulndb-${{ runner.os }}-
       - name: Load scanner built from source
-        if: inputs.scanner-source-path != ''
+        if: "inputs.scanner-source-path != ''"
         run: docker load -q -i "$RUNNER_TEMP/sawone-tools/scanner.tar"
       - name: Scan (${{ matrix.stage }})
         id: scan
@@ -308,7 +308,7 @@ jobs:
           [ -f "$target/sawone-si-reports/summary.md" ] && cat "$target/sawone-si-reports/summary.md" >> "$GITHUB_STEP_SUMMARY"
           exit 0
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always() && steps.scan.outputs.reports != ''
+        if: "always() && steps.scan.outputs.reports != ''"
         with:
           name: ${{ inputs.artifact-prefix }}-part-${{ matrix.stage }}
           path: ${{ steps.scan.outputs.reports }}
@@ -326,7 +326,7 @@ jobs:
   redteam:
     name: Test · LLM red team
     needs: [validate, tools]
-    if: needs.validate.outputs.run-redteam == 'true'
+    if: "needs.validate.outputs.run-redteam == 'true'"
     runs-on: ${{ inputs.runs-on }}
     permissions: { contents: read }
     steps:
@@ -337,7 +337,7 @@ jobs:
           name: ${{ inputs.artifact-prefix }}-tools
           path: ${{ runner.temp }}/sawone-tools
       - name: Load scanner built from source
-        if: inputs.scanner-source-path != ''
+        if: "inputs.scanner-source-path != ''"
         run: docker load -q -i "$RUNNER_TEMP/sawone-tools/scanner.tar"
       - name: Red-team the endpoint (garak + promptfoo)
         id: scan
@@ -368,7 +368,7 @@ jobs:
           [ -f "$target/sawone-si-reports/summary.md" ] && cat "$target/sawone-si-reports/summary.md" >> "$GITHUB_STEP_SUMMARY"
           exit 0
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always() && steps.scan.outputs.reports != ''
+        if: "always() && steps.scan.outputs.reports != ''"
         with:
           name: ${{ inputs.artifact-prefix }}-part-ai-redteam
           path: ${{ steps.scan.outputs.reports }}
@@ -386,7 +386,7 @@ jobs:
   report:
     name: Release · report
     needs: [validate, tools, gates, redteam]
-    if: always() && needs.validate.result == 'success'
+    if: "always() && needs.validate.result == 'success'"
     runs-on: ${{ inputs.runs-on }}
     permissions:
       contents: read
@@ -399,7 +399,7 @@ jobs:
       artifact: ${{ inputs.artifact-prefix }}-report
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        if: needs.tools.result == 'success'
+        if: "needs.tools.result == 'success'"
         with:
           name: ${{ inputs.artifact-prefix }}-tools
           path: ${{ runner.temp }}/sawone-tools
@@ -484,7 +484,7 @@ jobs:
           jq -r '.stages[] | select(.status == "failed") | "::warning title=gate failed::\(.stage) / \(.tool): \(.findings // .reason)"' "$summ"
           exit 0
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always() && steps.merge.outputs.dir != ''
+        if: "always() && steps.merge.outputs.dir != ''"
         with:
           name: ${{ inputs.artifact-prefix }}-report
           path: ${{ steps.merge.outputs.dir }}
