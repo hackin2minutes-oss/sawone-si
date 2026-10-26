@@ -10,11 +10,7 @@ These tests are purely in-process (no Docker, no network) and cover:
   - Missing model provenance
   - Clean file (no findings)
 """
-import sys
 from pathlib import Path
-
-# conftest already adds scanner/ to sys.path
-import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 
