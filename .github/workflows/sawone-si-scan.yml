@@ -224,25 +224,31 @@ jobs:
             echo "::error::CISA KEV feed unavailable while block-kev is on; the scan parts will report it"
           fi
           exit 0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ inputs.artifact-prefix }}-tools
+          path: ${{ runner.temp }}/sawone-tools
+          retention-days: 3
+          if-no-files-found: error
       - name: Cache key (vulnerability databases, one per day)
         id: cachekey
         run: echo "key=sawone-si-vulndb-${RUNNER_OS}-$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
-      - name: Evict stale vulnerability database caches (keep only today's)
+      - name: Evict ALL existing vulnerability database caches before saving new one
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          TODAY_KEY: ${{ steps.cachekey.outputs.key }}
+          NEW_KEY: ${{ steps.cachekey.outputs.key }}
         run: |
           set -uo pipefail
           prefix="sawone-si-vulndb-${RUNNER_OS}-"
-          echo "Evicting old vulndb caches (keeping: $TODAY_KEY)..."
+          echo "Evicting all existing vulndb caches (including today's, to free quota before save)..."
           gh api "repos/$REPO/actions/caches?per_page=100" \
-            --jq '.actions_caches[] | select(.key | startswith("'"$prefix"'")) | select(.key != "'"$TODAY_KEY"'") | .id' \
+            --jq '.actions_caches[] | select(.key | startswith("'"$prefix"'")) | .id' \
             | while read -r cache_id; do
-                echo "  Deleting old cache $cache_id..."
+                echo "  Deleting cache $cache_id..."
                 gh api --method DELETE "repos/$REPO/actions/caches/$cache_id" && echo "  Deleted $cache_id" || echo "  Failed to delete $cache_id (may already be gone)"
               done
-          echo "Eviction complete."
+          echo "Eviction complete. New cache will be saved as: $NEW_KEY"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/sawone-cache
@@ -259,12 +265,6 @@ jobs:
           [ -n "$grype" ] && docker run --rm -u 0:0 -v "$cache/grype:/grype-db" -e GRYPE_DB_CACHE_DIR=/grype-db "$grype" db update \
             || echo "::warning::Grype DB warm-up failed; each job will download it"
           sudo chmod -R a+rwX "$cache"
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: ${{ inputs.artifact-prefix }}-tools
-          path: ${{ runner.temp }}/sawone-tools
-          retention-days: 3
-          if-no-files-found: error
 
   gates:
     name: ${{ fromJSON('{"ai-threat-model":"Plan","secrets":"Code","sast":"Code","ai-prompts":"Code","ai-notebooks":"Code","ai-agents":"Code","sca":"Build","ai-bom":"Build","ai-models":"Build","ai-data":"Build","iac":"Build","ai-infra":"Build","cicd":"Build","ai-guardrails":"Operate"}')[matrix.stage] }} · ${{ matrix.stage }}
