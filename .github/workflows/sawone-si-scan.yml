@@ -160,13 +160,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: inputs.scanner-source-path != ''
         with: { persist-credentials: false }
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: inputs.engine-ref != ''
-        with:
-          repository: hackin2minutes-oss/sawone
-          ref: ${{ inputs.engine-ref }}
-          path: .sawone-engine
-          persist-credentials: false
+#       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+#         if: inputs.engine-ref != ''
+#         with:
+#           repository: hackin2minutes-oss/sawone
+#           ref: ${{ inputs.engine-ref }}
+#           path: .sawone-engine
+#           persist-credentials: false
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         if: inputs.scanner-source-path == '' && inputs.scanner-identity-regexp != ''
       - name: Resolve the scanner image to a digest
@@ -181,10 +181,10 @@ jobs:
           out="$RUNNER_TEMP/sawone-tools"; mkdir -p "$out"
           if [ -n "$SCANNER_SRC" ]; then
             base_args=()
-            if [ -n "$ENGINE_REF" ]; then
-              docker build --pull -t "sawone-engine:run-$GITHUB_RUN_ID" "$GITHUB_WORKSPACE/.sawone-engine/scanner"
-              base_args=(--build-arg "SAWONE_IMAGE=sawone-engine:run-$GITHUB_RUN_ID")
-            fi
+#            if [ -n "$ENGINE_REF" ]; then
+#              docker build --pull -t "sawone-engine:run-$GITHUB_RUN_ID" "$GITHUB_WORKSPACE/.sawone-engine/scanner"
+#              base_args=(--build-arg "SAWONE_IMAGE=sawone-engine:run-$GITHUB_RUN_ID")
+#            fi
             ref="sawone-si-scanner:run-$GITHUB_RUN_ID"
             docker build "${base_args[@]}" -t "$ref" "$GITHUB_WORKSPACE/$SCANNER_SRC"
             docker save -o "$out/scanner.tar" "$ref"
