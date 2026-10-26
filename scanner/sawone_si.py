@@ -272,10 +272,11 @@ class AIScan(ds.Scan):
             env["SAWONE_LLM_API_KEY"] = os.environ[key_env]
         mins = int(rt.get("max_minutes", 20))
         # the image's entrypoint runs garak and/or promptfoo and writes reports into /out
+        self.pinned["_redteam"] = image
+        ds.IMAGES["_redteam"] = image
         code, _ = self.docker("_redteam", ["--out", "/out"], "redteam",
                               extra=["-v", f"{out}:/out", *sum([["-e", k] for k in env], [])],
                               timeout=60 * (mins + 10), mount=False)
-        # docker() looks up IMAGES[tool]; register the image under a private key
         if code not in (0, 1):
             self.record("ai-redteam", "LLM red team", "error", self.last_error("redteam"))
             return None
@@ -336,8 +337,7 @@ def ai_bom(ai):
             "components": comps}
 
 
-# register the red-team image so Scan.docker() can find it under the "_redteam" tool key
-ds.IMAGES["_redteam"] = REDTEAM_IMAGE
+# Note: _redteam image is handled directly in _run_redteam to avoid breaking --resolve-tools
 
 
 def main():
