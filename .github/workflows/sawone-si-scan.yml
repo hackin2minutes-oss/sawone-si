@@ -199,7 +199,11 @@ jobs:
               ref="$repo@$digest"
             fi
             if [ -n "$IDENTITY" ]; then
-              cosign verify "$ref" --certificate-identity-regexp "$IDENTITY" --certificate-oidc-issuer https://token.actions.githubusercontent.com > /dev/null && echo "scanner signature verified: $ref"
+              cosign verify "$ref" \
+                --certificate-identity-regexp "$IDENTITY" \
+                --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+                > /dev/null
+              echo "scanner signature verified: $ref"
             else
               echo "::warning::scanner-identity-regexp is empty: the scanner image signature was not verified"
             fi
