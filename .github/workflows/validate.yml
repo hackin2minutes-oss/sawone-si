@@ -87,7 +87,7 @@ jobs:
     needs: [lint, unit, engine]
     permissions:
       contents: read
-      actions: read
+      actions: write
       security-events: write
     uses: ./.github/workflows/sawone-si-scan.yml
     with:
