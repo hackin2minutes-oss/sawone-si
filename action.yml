@@ -1,8 +1,10 @@
 name: SawOne-SI
 description: >-
   DevSecOps for AI / LLM applications, by phase: an AI threat model; secrets and SAST (Semgrep with an AI rule
-  pack); prompt, notebook and agent/MCP checks; an AI-BOM, model-file scanning (never loaded), and training/RAG
-  data checks (PII, poisoning); AI cloud-infrastructure checks; and opt-in LLM red teaming (garak + promptfoo).
+  pack); prompt, notebook and agent/MCP checks; LLM supply-chain checks (trust_remote_code, unpinned AI deps,
+  unsigned model downloads, model provenance); an AI-BOM, model-file scanning (never loaded), and training/RAG
+  data checks (PII, poisoning); AI cloud-infrastructure checks; opt-in LLM red teaming (garak + promptfoo);
+  and automatic GitHub PR inline review comments with severity labels and OWASP tags.
   Maps to OWASP LLM & ML Top 10, MITRE ATLAS, NIST AI RMF, ISO/IEC 42001 and SDAIA AI Ethics, with SARIF, JUnit
   and a PDF report in English and Arabic.
 author: hackin2minutes-oss
@@ -60,6 +62,14 @@ inputs:
   scanner-image:
     description: Scanner image to use
     default: ghcr.io/hackin2minutes-oss/sawone-si-scanner:1
+  pr-review:
+    description: >-
+      Post inline security findings as GitHub Pull Request review comments (REQUEST_CHANGES on failures,
+      COMMENT on pass). Set 'true' to enable. Requires write permission on pull-requests.
+    default: "true"
+  pr-max-comments:
+    description: Maximum number of inline PR review comments to post (1-50)
+    default: "25"
 
 outputs:
   passed:
@@ -92,6 +102,8 @@ runs:
         SCANNER_IMAGE: ${{ inputs.scanner-image }}
         SAWONE_LLM_ENDPOINT: ${{ inputs.redteam-endpoint }}
         SCAN_REDTEAM_PROFILE: ${{ inputs.redteam-profile }}
+        SAWONE_PR_REVIEW: ${{ inputs.pr-review }}
+        SAWONE_PR_MAX_COMMENTS: ${{ inputs.pr-max-comments }}
         GH_TOKEN: ${{ github.token }}
       run: |
         target="$(cd "$GITHUB_WORKSPACE/$SCAN_PATH_IN" && pwd)"
@@ -117,6 +129,11 @@ runs:
           -e SAWONE_LLM_ENDPOINT -e SAWONE_LLM_API_KEY -e SCAN_REDTEAM_PROFILE \
           -e REPO="$GITHUB_REPOSITORY" -e SHA="$GITHUB_SHA" -e REF="$GITHUB_REF" \
           -e RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+          -e GITHUB_TOKEN="$GH_TOKEN" \
+          -e GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
+          -e GITHUB_SHA="$GITHUB_SHA" \
+          -e GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH:-}" \
+          -e SAWONE_PR_MAX_COMMENTS="$SAWONE_PR_MAX_COMMENTS" \
           "$SCANNER_IMAGE" --path "$target" --reports "$reports"
         code=$?
         set -e

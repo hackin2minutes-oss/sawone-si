@@ -43,7 +43,9 @@ from ai import detect as DET  # noqa: E402
 from ai import modelscan as MS  # noqa: E402
 from ai import pii as PII  # noqa: E402
 from ai import redteam as RT  # noqa: E402
+from ai import supply_chain as SC  # noqa: E402
 from ai import threatmodel as AITM  # noqa: E402
+from ai import pr_review as PR  # noqa: E402
 
 log = ds.log
 VERSION = "1.0.0"
@@ -112,11 +114,13 @@ class AIScan(ds.Scan):
         return [("threat-model", self.scan_threat_model), ("ai-threat-model", self.scan_ai_threat_model),
                 ("secrets", self.scan_secrets), ("sast", self.scan_sast), ("ai-prompts", self.scan_ai_prompts),
                 ("ai-notebooks", self.scan_ai_notebooks), ("ai-agents", self.scan_ai_agents),
+                ("ai-supply-chain", self.scan_ai_supply_chain),
                 ("sca", self.scan_sca), ("ai-bom", self.scan_ai_bom), ("ai-models", self.scan_ai_models),
                 ("ai-data", self.scan_ai_data), ("iac", self.scan_iac), ("ai-infra", self.scan_ai_infra),
                 ("cicd", self.scan_cicd), ("container", self.scan_containers), ("dast", self.scan_dast),
                 ("ai-redteam", self.scan_ai_redteam), ("runtime", self.scan_waf),
-                ("ai-guardrails", self.scan_ai_guardrails), ("tracking", self.defectdojo)]
+                ("ai-guardrails", self.scan_ai_guardrails), ("tracking", self.defectdojo),
+                ("pr-review", self.scan_pr_review)]
 
     # ---------------------------------------------------------------- helpers
     def _items(self, stage, tool, results, kind="ai"):
@@ -185,6 +189,19 @@ class AIScan(ds.Scan):
         if agent_comp and not cfgs:
             note = ", ".join(c["name"] for c in agent_comp[:4]) + " (agent framework in code — see SAST)"
         self._record_sarif("ai-agents", "Agent/MCP checks", res, "agents", "Agent/MCP checks", note)
+
+    # ---------------------------------------------------------------- code: LLM supply-chain
+    def scan_ai_supply_chain(self):
+        """Static supply-chain checks: trust_remote_code, unverified model sources,
+        unsigned downloads, VCS installs, unpinned AI deps, missing model provenance."""
+        res = SC.scan(self.ws, self.ai)
+        (self.reports / "raw" / "ai-supply-chain.json").write_text(json.dumps(res, indent=1))
+        if not res:
+            return self.record("ai-supply-chain", "LLM supply-chain", "passed",
+                               "no supply-chain issues found", gate=False)
+        self._record_sarif("ai-supply-chain", "LLM supply-chain", res, "supply-chain",
+                           "LLM supply-chain",
+                           f"{len(res)} finding(s): model integrity, pinning, provenance")
 
     # ---------------------------------------------------------------- build: AI-BOM, models, data, infra
     def scan_ai_bom(self):
@@ -315,6 +332,26 @@ class AIScan(ds.Scan):
         self.gate("ai-guardrails", "Guardrails", sum(1 for f in res if f.get("gating")),
                   ("present: " + ", ".join(present) + " · " if present else "")
                   + f"{len(missing)} required guardrail(s) missing", items=items)
+
+    # ---------------------------------------------------------------- monitor: GitHub PR review annotations
+    def scan_pr_review(self):
+        """Post inline SARIF findings as GitHub PR review comments and Actions annotations.
+
+        This stage is a no-op when GITHUB_TOKEN or a PR context is absent.
+        It also emits ::error / ::warning annotation lines for every SARIF file
+        found in reports/sarif/, which GitHub Actions surfaces in the Files tab.
+        """
+        sarif_dir = self.reports / "sarif"
+        # Always emit workflow annotations (works in push + PR workflows)
+        if sarif_dir.is_dir():
+            for sf in sorted(sarif_dir.glob("*.sarif")):
+                PR.annotate_from_sarif(sf, log=log)
+        # PR-specific inline review
+        posted = PR.post_pr_review(self.reports, log=log)
+        status = "posted" if posted else "skipped"
+        detail = "inline review comments posted to PR" if posted else \
+                 "not a PR context or GITHUB_TOKEN absent (annotations still emitted above)"
+        self.record("pr-review", "PR review annotations", status, detail, gate=False)
 
 
 # CycloneDX 1.6 ML-BOM ------------------------------------------------------
