@@ -92,7 +92,6 @@ jobs:
       path: tests/fixtures/vulnai
       artifact-prefix: consumer
       scanner-source-path: scanner
-      engine-ref: v1.4.0
       enforce: false
       upload-sarif: never
       pr-gate: all
