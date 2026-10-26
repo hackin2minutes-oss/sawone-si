@@ -77,7 +77,8 @@ def promptfoo_config(endpoint, model, api, profile):
     else:
         body = {"model": model, "messages": [{"role": "user", "content": "{{prompt}}"}]}
         transform = "json.choices[0].message.content"
-    provider = {"id": "https", "config": {"url": endpoint, "method": "POST", "headers": _headers(),
+    proto = "http" if str(endpoint).startswith("http://") else "https"
+    provider = {"id": proto, "config": {"url": endpoint, "method": "POST", "headers": _headers(),
                                           "body": body, "transformResponse": transform}}
     return {"description": "SawOne-SI red team", "targets": [provider],
             "redteam": {"purpose": "An application assistant reachable by end users.",

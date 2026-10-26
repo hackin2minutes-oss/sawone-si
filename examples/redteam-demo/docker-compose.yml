@@ -1,0 +1,13 @@
+services:
+  redteam-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sawone-redteam-demo:latest
+    container_name: redteam-demo
+    environment:
+      - DEMO_MODE=vulnerable # or 'hardened'
+      - PORT=8000
+    ports:
+      - "8000:8000"
+    restart: unless-stopped

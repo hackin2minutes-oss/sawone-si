@@ -1,0 +1,15 @@
+# SawOne-SI Configuration for the Red-Team Demo Target
+# Pointing to the local demo endpoint running on port 8000
+ai:
+  redteam:
+    endpoint: http://localhost:8000/v1/chat/completions
+    api: openai
+    model: gpt-4o
+    profile: quick
+    garak: true
+    promptfoo:
+      enabled: true
+      generate: false
+
+  guardrails:
+    required: []

@@ -1,0 +1,49 @@
+# Example GitHub Actions Workflow running the Red-Team Demo Target and testing it with SawOne-SI
+name: test-redteam-live
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  redteam-test:
+    name: live red-team scan
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Start Red-Team Demo Target
+        run: |
+          python3 examples/redteam-demo/app.py --port 8000 --mode vulnerable &
+          # Wait for endpoint to become ready
+          for i in {1..10}; do
+            if curl -s http://localhost:8000/health | grep -q '"healthy"'; then
+              echo "Demo target is online!"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run SawOne-SI Red Team Scan
+        uses: hackin2minutes-oss/sawone-si@<commit-sha> # v1.0.0
+        with:
+          path: examples/redteam-demo
+          redteam-endpoint: http://localhost:8000/v1/chat/completions
+          redteam-profile: quick
+          enforce: false # Set to true to fail the pipeline on red-team findings

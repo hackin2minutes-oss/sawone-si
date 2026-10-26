@@ -114,7 +114,7 @@ jobs:
           case "$IN_RT_PROFILE" in quick|full) ;; *) fail "redteam-profile must be quick or full";; esac
           for l in ${IN_LANGS//,/ }; do case "$l" in en|ar) ;; *) fail "report-languages: unknown language '$l'";; esac; done
           if [ -n "$IN_ENDPOINT" ]; then
-            [[ "$IN_ENDPOINT" =~ ^https://[^[:space:]]+$ ]] || fail "redteam-endpoint must be an https URL you own (a test endpoint)"
+            [[ "$IN_ENDPOINT" =~ ^https?://[^[:space:]]+$ ]] || fail "redteam-endpoint must be an http or https URL you own (a test endpoint)"
           fi
           [ -z "$IN_ENGINE_REF" ] || [ -n "$IN_SCANNER_SRC" ] || fail "engine-ref only applies with scanner-source-path"
           phases="$(echo "${IN_PHASES:-all}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"

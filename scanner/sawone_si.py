@@ -274,7 +274,8 @@ class AIScan(ds.Scan):
         mins = int(rt.get("max_minutes", 20))
         # the image's entrypoint runs garak and/or promptfoo and writes reports into /out
         code, _ = self.docker("_redteam", ["--out", "/out"], "redteam",
-                              extra=["-v", f"{out}:/out", *sum([["-e", k] for k in env], [])],
+                              extra=["-v", f"{out}:/out", "--net=host", "--add-host=host.docker.internal:host-gateway",
+                                     *sum([["-e", k] for k in env], [])],
                               timeout=60 * (mins + 10), mount=False)
         # docker() looks up IMAGES[tool]; register the image under a private key
         if code not in (0, 1):

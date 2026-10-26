@@ -1,0 +1,95 @@
+name: redteam-demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Red-team profile (quick or full)"
+        default: "quick"
+        type: choice
+        options:
+          - quick
+          - full
+  push:
+    branches: [main]
+    paths:
+      - "examples/redteam-demo/**"
+      - "redteam/**"
+      - ".github/workflows/redteam-demo.yml"
+  pull_request:
+    paths:
+      - "examples/redteam-demo/**"
+      - "redteam/**"
+      - ".github/workflows/redteam-demo.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions: {}
+
+jobs:
+  test-demo-target:
+    name: live red-team scan
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Run demo app unit tests
+        run: python3 examples/redteam-demo/test_demo.py
+
+      - name: Build red-team container image
+        run: docker build -q -t sawone-si-redteam:local redteam
+
+      - name: Start demo target (vulnerable mode)
+        run: |
+          python3 examples/redteam-demo/app.py --port 8000 --mode vulnerable &
+          for i in {1..15}; do
+            if curl -s http://localhost:8000/health | grep -q '"healthy"'; then
+              echo "Demo target is online in vulnerable mode!"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Live attack simulation with red-team runner (Garak & Promptfoo)
+        run: |
+          mkdir -p "$RUNNER_TEMP/rt-out"
+          docker run --rm --net=host \
+            -e SAWONE_LLM_ENDPOINT="http://localhost:8000/v1/chat/completions" \
+            -e SAWONE_LLM_MODEL="gpt-4o" \
+            -e SAWONE_LLM_API="openai" \
+            -e SAWONE_REDTEAM_PROFILE="${{ inputs.profile || 'quick' }}" \
+            -e PROMPTFOO_DISABLE_TELEMETRY="1" \
+            -e PROMPTFOO_DISABLE_REMOTE_GENERATION="1" \
+            -v "$RUNNER_TEMP/rt-out:/out" \
+            sawone-si-redteam:local --out /out
+
+      - name: Verify red-team reports and audit trail
+        run: |
+          echo "=== Red-Team Runner Output Files ==="
+          ls -la "$RUNNER_TEMP/rt-out"
+          test -s "$RUNNER_TEMP/rt-out/redteam-config.redacted.json"
+          echo "Red-team configuration verified."
+
+          # Verify demo target recorded attacks
+          stats=$(curl -s http://localhost:8000/api/stats)
+          echo "=== Demo Target Server Stats ==="
+          echo "$stats" | jq .
+
+      - name: Upload red-team reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: redteam-demo-reports
+          path: ${{ runner.temp }}/rt-out
+          if-no-files-found: warn
