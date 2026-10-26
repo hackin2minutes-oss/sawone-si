@@ -30,7 +30,10 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with: { python-version: "3.13" }
       - name: Install linters
-        run: python -m pip install --quiet actionlint-py shellcheck-py zizmor pyflakes
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y shellcheck
+          python -m pip install --quiet actionlint-py shellcheck-py zizmor pyflakes
       - name: actionlint (includes shellcheck of every run block)
         run: actionlint -color
       - name: shellcheck the scripts
@@ -64,12 +67,14 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: hackin2minutes-oss/sawone
-          ref: ${{ needs.engine.outputs.ref }}
-          path: engine
-          persist-credentials: false
+      # The external engine checkout is intentionally omitted; unit tests use the engine built in the `engine` job.
+      # If you need to enable it, uncomment the lines below:
+      # - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.0
+      #   with:
+      #     repository: hackin2minutes-oss/sawone
+      #     ref: ${{ needs.engine.outputs.ref }}
+      #     path: engine
+      #     persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with: { python-version: "3.13" }
       - name: Install
