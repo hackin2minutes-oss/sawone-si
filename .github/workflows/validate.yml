@@ -92,6 +92,7 @@ jobs:
       contents: read
       actions: read
       security-events: write
+    runs-on: ubuntu-24.04
     uses: ./.github/workflows/sawone-si-scan.yml
     with:
       path: tests/fixtures/vulnai
