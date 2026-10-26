@@ -1,5 +1,6 @@
 """SawOne-SI's analysers on the vulnai fixture: detection, model scan, PII, configs, and the AI rule pack."""
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
