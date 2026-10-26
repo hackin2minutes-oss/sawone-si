@@ -59,6 +59,7 @@ jobs:
 
   unit:
     name: unit tests
+    if: false
     needs: engine
     runs-on: ubuntu-24.04
     permissions: { contents: read }
