@@ -60,6 +60,14 @@ on:
         type: string
         default: ""
       artifact-prefix: { type: string, default: sawone-si }
+      retention-days:
+        description: "Days to retain the final report artifact (default: 1)"
+        type: number
+        default: 1
+      cache-vulndb:
+        description: "Cache vulnerability databases between runs (default false to respect 500MB storage quota)"
+        type: boolean
+        default: false
       runs-on: { type: string, default: ubuntu-24.04 }
     secrets:
       redteam-api-key:
@@ -228,12 +236,14 @@ jobs:
         with:
           name: ${{ inputs.artifact-prefix }}-tools
           path: ${{ runner.temp }}/sawone-tools
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: error
       - name: Cache key (vulnerability databases, one per day)
+        if: ${{ inputs.cache-vulndb }}
         id: cachekey
         run: echo "key=sawone-si-vulndb-${RUNNER_OS}-$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
       - name: Evict ALL existing vulnerability database caches before saving new one
+        if: ${{ inputs.cache-vulndb }}
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -250,11 +260,13 @@ jobs:
               done
           echo "Eviction complete. New cache will be saved as: $NEW_KEY"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: ${{ inputs.cache-vulndb }}
         with:
           path: ${{ runner.temp }}/sawone-cache
           key: ${{ steps.cachekey.outputs.key }}
           restore-keys: sawone-si-vulndb-${{ runner.os }}-
       - name: Warm the Trivy and Grype databases
+        if: ${{ inputs.cache-vulndb }}
         run: |
           set -uo pipefail
           cache="$RUNNER_TEMP/sawone-cache"; lock="$RUNNER_TEMP/sawone-tools/tools.lock.json"
@@ -284,6 +296,7 @@ jobs:
           name: ${{ inputs.artifact-prefix }}-tools
           path: ${{ runner.temp }}/sawone-tools
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: ${{ inputs.cache-vulndb }}
         with:
           path: ${{ runner.temp }}/sawone-cache
           key: ${{ needs.tools.outputs.cache-key }}
@@ -309,6 +322,7 @@ jobs:
           set -uo pipefail
           target="$(realpath "$GITHUB_WORKSPACE/$SCAN_PATH_IN")"
           tools="$RUNNER_TEMP/sawone-tools"
+          mkdir -p "$RUNNER_TEMP/sawone-cache"
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$target:$target" -w "$target" -v "$tools:$tools:ro" \
             -e SCAN_ONLY -e SCAN_CONFIG -e SCAN_SEVERITY -e SCAN_ENFORCE -e SCAN_SKIP -e GH_TOKEN \
@@ -328,7 +342,7 @@ jobs:
         with:
           name: ${{ inputs.artifact-prefix }}-part-${{ matrix.stage }}
           path: ${{ steps.scan.outputs.reports }}
-          retention-days: 7
+          retention-days: 1
           if-no-files-found: warn
       - name: Result
         env: { CODE: "${{ steps.scan.outputs.code }}" }
@@ -388,7 +402,7 @@ jobs:
         with:
           name: ${{ inputs.artifact-prefix }}-part-ai-redteam
           path: ${{ steps.scan.outputs.reports }}
-          retention-days: 7
+          retention-days: 1
           if-no-files-found: warn
       - name: Result
         env: { CODE: "${{ steps.scan.outputs.code }}" }
@@ -504,7 +518,7 @@ jobs:
         with:
           name: ${{ inputs.artifact-prefix }}-report
           path: ${{ steps.merge.outputs.dir }}
-          retention-days: 30
+          retention-days: ${{ inputs.retention-days }}
           if-no-files-found: error
       - name: Publish to code scanning
         if: >-
