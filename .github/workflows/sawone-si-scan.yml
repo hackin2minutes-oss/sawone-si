@@ -152,7 +152,7 @@ jobs:
     name: Plan · resolve tools
     needs: validate
     runs-on: ${{ inputs.runs-on }}
-    permissions: { contents: read }
+    permissions: { contents: read, actions: write }
     outputs:
       scanner: ${{ steps.scanner.outputs.ref }}
       cache-key: ${{ steps.cachekey.outputs.key }}
@@ -227,6 +227,22 @@ jobs:
       - name: Cache key (vulnerability databases, one per day)
         id: cachekey
         run: echo "key=sawone-si-vulndb-${RUNNER_OS}-$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+      - name: Evict stale vulnerability database caches (keep only today's)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TODAY_KEY: ${{ steps.cachekey.outputs.key }}
+        run: |
+          set -uo pipefail
+          prefix="sawone-si-vulndb-${RUNNER_OS}-"
+          echo "Evicting old vulndb caches (keeping: $TODAY_KEY)..."
+          gh api "repos/$REPO/actions/caches?per_page=100" \
+            --jq '.actions_caches[] | select(.key | startswith("'"$prefix"'")) | select(.key != "'"$TODAY_KEY"'") | .id' \
+            | while read -r cache_id; do
+                echo "  Deleting old cache $cache_id..."
+                gh api --method DELETE "repos/$REPO/actions/caches/$cache_id" && echo "  Deleted $cache_id" || echo "  Failed to delete $cache_id (may already be gone)"
+              done
+          echo "Eviction complete."
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/sawone-cache
