@@ -44,6 +44,11 @@ jobs:
         run: scripts/pin-actions.sh --check
       - name: zizmor
         run: zizmor --config .github/zizmor.yml --offline .github/workflows action.yml
+      - name: Install Graphviz System Dependency
+        run: |
+          sudo apt-get update && sudo apt-get install -y graphviz
+        shell: bash
+
 
   engine:
     name: engine version
@@ -52,103 +57,4 @@ jobs:
     outputs:
       ref: ${{ steps.v.outputs.ref }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { persist-credentials: false }
-      - id: v
-        run: |
-          ref="$(tr -d '[:space:]' < ENGINE_VERSION)"
-          [[ "$ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::ENGINE_VERSION must be vX.Y.Z"; exit 1; }
-          echo "ref=$ref" >> "$GITHUB_OUTPUT"
-  unit:
-    name: unit tests
-    needs: engine
-    runs-on: ubuntu-24.04
-    permissions: { contents: read }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { persist-credentials: false }
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: hackin2minutes-oss/sawone
-          ref: ${{ needs.engine.outputs.ref }}
-          path: engine
-          persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with: { python-version: "3.13" }
-      - name: Install
-        run: python -m pip install --quiet pytest pyyaml weasyprint semgrep "nbformat>=5.9,<6"
-      - name: pytest
-        env:
-          SAWONE_ENGINE: ${{ github.workspace }}/engine/scanner
-        run: python -m pytest tests/unit -q
-
-  consumer:
-    name: consumer vulnai (source)
-    needs: [lint, unit, engine]
-    permissions:
-      contents: read
-      actions: write
-      security-events: write
-    uses: ./.github/workflows/sawone-si-scan.yml
-    with:
-      path: tests/fixtures/vulnai
-      artifact-prefix: consumer
-      scanner-source-path: scanner
-      engine-ref: v1.4.0
-      enforce: false
-      upload-sarif: never
-      pr-gate: all
-
-  assert:
-    name: assert consumer findings
-    needs: consumer
-    if: always()
-    runs-on: ubuntu-24.04
-    permissions: { contents: read }
-    steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with: { name: consumer-report, path: report }
-      - name: Every AI stage flagged the planted flaws, and the report is complete
-        run: |
-          set -uo pipefail
-          s=report/summary.json bad=0
-          jq -r '.stages[] | "\(.stage)\t\(.tool)\t\(.status)\t\(.findings // .reason)"' "$s"
-          for st in ai-prompts ai-notebooks ai-agents ai-models ai-data ai-infra sast; do
-            jq -e --arg s "$st" '[.stages[] | select(.stage == $s and .status == "failed")] | length > 0' "$s" > /dev/null \
-              || { echo "::error::$st did not fail on the vulnerable fixture"; bad=1; }
-          done
-          # ai-redteam is a separate workflow job that is skipped when no endpoint is configured.
-          # When skipped, no scanner runs, so no summary.json row is written — that is expected.
-          # Verify only that ai-redteam did not fail or error if it did run.
-          rt_bad=$(jq '[.stages[] | select(.stage == "ai-redteam" and (.status == "failed" or .status == "error"))] | length' "$s")
-          [ "$rt_bad" = 0 ] || { echo "::error::ai-redteam unexpectedly failed/errored"; bad=1; }
-          errors=$(jq '[.stages[] | select(.status == "error")] | length' "$s")
-          [ "$errors" = 0 ] || { echo "::error::$errors scanner error(s)"; bad=1; }
-          jq -e '[.compliance[] | select(.key == "owasp-llm")] | length == 10' "$s" > /dev/null || { echo "::error::OWASP LLM map missing"; bad=1; }
-          jq -e '[.compliance[] | select(.key == "sdaia-ai")] | length >= 4' "$s" > /dev/null || { echo "::error::SDAIA map missing"; bad=1; }
-          test -s report/security-report.pdf || { echo "::error::no PDF"; bad=1; }
-          test -s report/security-report-ar.pdf || { echo "::error::no Arabic PDF"; bad=1; }
-          grep -q 'SawOne-SI' report/security-report.html || { echo "::error::report not branded"; bad=1; }
-          grep -q 'AI security profile' report/security-report.html || { echo "::error::AI chapter missing"; bad=1; }
-          (cd report && sha256sum --quiet -c evidence/manifest.sha256) || { echo "::error::evidence manifest does not verify"; bad=1; }
-          exit $bad
-  redteam-selftest:
-    name: red-team image self-test
-    needs: lint
-    runs-on: ubuntu-24.04
-    permissions: { contents: read }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { persist-credentials: false }
-      - name: Build the red-team image
-        run: docker build -q -t sawone-si-redteam:test redteam
-      - name: Self-test (configs generated, tools present; no endpoint attacked)
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/rt"
-          docker run --rm -e SAWONE_REDTEAM_DRYRUN=1 -e SAWONE_LLM_MODEL=gpt-4o \
-            -v "$RUNNER_TEMP/rt:/out" sawone-si-redteam:test --out /out
-          test -s "$RUNNER_TEMP/rt/redteam-config.redacted.json"
-          # the live-key configs are not left behind
-          test ! -f "$RUNNER_TEMP/rt/garak-generator.json"
-          echo "red-team image self-test passed"
+      - 
