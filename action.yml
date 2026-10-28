@@ -1,137 +1,128 @@
 name: SawOne-SI
-description: >-
-  DevSecOps for AI / LLM applications, by phase: an AI threat model; secrets and SAST (Semgrep with an AI rule
-  pack); prompt, notebook and agent/MCP checks; an AI-BOM, model-file scanning (never loaded), and training/RAG
-  data checks (PII, poisoning); AI cloud-infrastructure checks; and opt-in LLM red teaming (garak + promptfoo).
-  Maps to OWASP LLM & ML Top 10, MITRE ATLAS, NIST AI RMF, ISO/IEC 42001 and SDAIA AI Ethics, with SARIF, JUnit
-  and a PDF report in English and Arabic.
+description: 'DevSecOps for AI / LLM applications, by phase: an AI threat model; secrets
+  and SAST (Semgrep with an AI rule pack); prompt, notebook and agent/MCP checks;
+  an AI-BOM, model-file scanning (never loaded), and training/RAG data checks (PII,
+  poisoning); AI cloud-infrastructure checks; and opt-in LLM red teaming (garak +
+  promptfoo). Maps to OWASP LLM & ML Top 10, MITRE ATLAS, NIST AI RMF, ISO/IEC 42001
+  and SDAIA AI Ethics, with SARIF, JUnit and a PDF report in English and Arabic.'
 author: hackin2minutes-oss
 branding:
   icon: cpu
   color: purple
-
 inputs:
   path:
     description: Directory of the project (relative to the workspace)
-    default: "."
+    default: .
   config:
     description: Optional config file (relative to path)
-    default: ".sawone.yml"
+    default: .sawone.yml
   phases:
-    description: "DevSecOps phases to scan: all, or a comma list of plan, code, build, test, release"
-    default: "all"
+    description: 'DevSecOps phases to scan: all, or a comma list of plan, code, build,
+      test, release'
+    default: all
   redteam-endpoint:
-    description: >-
-      A test/staging LLM endpoint you own to red-team (OpenAI-compatible chat/completions by default). Leave
-      empty to skip the live red-team stage. Never point this at production.
-    default: ""
+    description: A test/staging LLM endpoint you own to red-team (OpenAI-compatible
+      chat/completions by default). Leave empty to skip the live red-team stage. Never
+      point this at production.
+    default: ''
   redteam-profile:
-    description: "LLM red-team depth: quick or full"
-    default: "quick"
+    description: 'LLM red-team depth: quick or full'
+    default: quick
   severity:
     description: Severities that fail a gate, lowest first (overrides the config file)
-    default: ""
+    default: ''
   enforce:
-    description: "'false' = report only, never fail the job"
-    default: ""
+    description: '''false'' = report only, never fail the job'
+    default: ''
   baseline-file:
     description: Accepted risks and threat decisions, relative to path
-    default: ""
+    default: ''
   block-kev:
-    description: Block CVEs in CISA's Known Exploited Vulnerabilities catalogue at any severity
-    default: "true"
+    description: Block CVEs in CISA's Known Exploited Vulnerabilities catalogue at
+      any severity
+    default: 'true'
   epss-threshold:
     description: Also block CVEs with an EPSS score at or above this (0-1; 0 = off)
-    default: "0"
+    default: '0'
   skip:
     description: Comma-separated tools or stages to skip
-    default: ""
+    default: ''
   report-languages:
-    description: "PDF languages: en, ar or en,ar"
-    default: "en,ar"
+    description: 'PDF languages: en, ar or en,ar'
+    default: en,ar
   upload-sarif:
-    description: >-
-      Publish findings to GitHub code scanning: 'auto' (public repos only), 'true' (also private repos with
-      GitHub Advanced Security) or 'false'
-    default: "auto"
+    description: 'Publish findings to GitHub code scanning: ''auto'' (public repos
+      only), ''true'' (also private repos with GitHub Advanced Security) or ''false'''
+    default: auto
   artifact-name:
-    description: Name of the uploaded reports artifact (must be unique per job in a run)
+    description: Name of the uploaded reports artifact (must be unique per job in
+      a run)
     default: sawone-si-reports
   scanner-image:
     description: Scanner image to use
     default: ghcr.io/hackin2minutes-oss/sawone-si-scanner:1
-
 outputs:
   passed:
-    description: "'true' when every gate passed"
+    description: '''true'' when every gate passed'
     value: ${{ steps.scan.outputs.passed }}
   reports:
     description: Path of the reports directory
     value: ${{ steps.scan.outputs.reports }}
-
 runs:
   using: composite
   steps:
-    - name: Scan
-      id: scan
-      shell: bash
-      env:
-        SCAN_PATH_IN: ${{ inputs.path }}
-        SCAN_CONFIG: ${{ inputs.config }}
-        SCAN_SEVERITY: ${{ inputs.severity }}
-        SCAN_ENFORCE: ${{ inputs.enforce }}
-        SCAN_SKIP: ${{ inputs.skip }}
-        SCAN_PHASES: ${{ inputs.phases }}
-        SCAN_BASELINE: ${{ inputs.baseline-file }}
-        SCAN_BLOCK_KEV: ${{ inputs.block-kev }}
-        SCAN_EPSS_THRESHOLD: ${{ inputs.epss-threshold }}
-        SCAN_REPORT_LANGUAGES: ${{ inputs.report-languages }}
-        SCANNER_IMAGE: ${{ inputs.scanner-image }}
-        SAWONE_LLM_ENDPOINT: ${{ inputs.redteam-endpoint }}
-        SCAN_REDTEAM_PROFILE: ${{ inputs.redteam-profile }}
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        target="$(cd "$GITHUB_WORKSPACE/$SCAN_PATH_IN" && pwd)"
-        set +e
-        docker run --rm \
-          -v /var/run/docker.sock:/var/run/docker.sock \
-          -v "$target:$target" -w "$target" \
-          -e SCAN_CONFIG -e SCAN_SEVERITY -e SCAN_ENFORCE -e SCAN_SKIP -e SCAN_PHASES \
-          -e SCAN_BASELINE -e SCAN_BLOCK_KEV -e SCAN_EPSS_THRESHOLD -e SCAN_REPORT_LANGUAGES \
-          -e SAWONE_LLM_ENDPOINT -e SAWONE_LLM_API_KEY -e SCAN_REDTEAM_PROFILE \
-          -e REPO="$GITHUB_REPOSITORY" -e SHA="$GITHUB_SHA" -e REF="$GITHUB_REF" \
-          -e RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
-          "$SCANNER_IMAGE" --path "$target" --reports sawone-si-reports
-        code=$?
-        set -e
-        echo "code=$code" >> "$GITHUB_OUTPUT"
-        echo "reports=$target/sawone-si-reports" >> "$GITHUB_OUTPUT"
-        echo "passed=$([ "$code" = 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-        if [ -f "$target/sawone-si-reports/summary.md" ]; then cat "$target/sawone-si-reports/summary.md" >> "$GITHUB_STEP_SUMMARY"; fi
-
-    - name: Upload reports
-      if: always()
-      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-      with:
-        name: ${{ inputs.artifact-name }}
-        path: ${{ steps.scan.outputs.reports }}
-        if-no-files-found: warn
-
-    - name: Publish to code scanning
-      if: >-
-        always() && steps.scan.outputs.reports != '' &&
-        (inputs.upload-sarif == 'true' || (inputs.upload-sarif == 'auto' && github.event.repository.visibility == 'public'))
-      uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
-      with:
-        sarif_file: ${{ steps.scan.outputs.reports }}/sarif
-
-    - name: Result
-      shell: bash
-      env:
-        CODE: ${{ steps.scan.outputs.code }}
-      run: |
-        case "$CODE" in
-          0) echo "All security gates passed." ;;
-          1) echo "::error::Security gates failed — see the job summary and the sawone-si-reports artifact."; exit 1 ;;
-          *) echo "::error::Scanner error (exit $CODE) — see sawone-si-reports/logs."; exit "$CODE" ;;
-        esac
+  - name: Install Graphviz System Dependency
+    run: sudo apt-get update && sudo apt-get install -y graphviz
+    shell: bash
+  - name: Scan
+    id: scan
+    shell: bash
+    env:
+      SCAN_PATH_IN: ${{ inputs.path }}
+      SCAN_CONFIG: ${{ inputs.config }}
+      SCAN_SEVERITY: ${{ inputs.severity }}
+      SCAN_ENFORCE: ${{ inputs.enforce }}
+      SCAN_SKIP: ${{ inputs.skip }}
+      SCAN_PHASES: ${{ inputs.phases }}
+      SCAN_BASELINE: ${{ inputs.baseline-file }}
+      SCAN_BLOCK_KEV: ${{ inputs.block-kev }}
+      SCAN_EPSS_THRESHOLD: ${{ inputs.epss-threshold }}
+      SCAN_REPORT_LANGUAGES: ${{ inputs.report-languages }}
+      SCANNER_IMAGE: ${{ inputs.scanner-image }}
+      SAWONE_LLM_ENDPOINT: ${{ inputs.redteam-endpoint }}
+      SCAN_REDTEAM_PROFILE: ${{ inputs.redteam-profile }}
+      GH_TOKEN: ${{ github.token }}
+    run: "target=\"$(cd \"$GITHUB_WORKSPACE/$SCAN_PATH_IN\" && pwd)\"\nset +e\ndocker\
+      \ run --rm \\\n  -v /var/run/docker.sock:/var/run/docker.sock \\\n  -v \"$target:$target\"\
+      \ -w \"$target\" \\\n  -e SCAN_CONFIG -e SCAN_SEVERITY -e SCAN_ENFORCE -e SCAN_SKIP\
+      \ -e SCAN_PHASES \\\n  -e SCAN_BASELINE -e SCAN_BLOCK_KEV -e SCAN_EPSS_THRESHOLD\
+      \ -e SCAN_REPORT_LANGUAGES \\\n  -e SAWONE_LLM_ENDPOINT -e SAWONE_LLM_API_KEY\
+      \ -e SCAN_REDTEAM_PROFILE \\\n  -e REPO=\"$GITHUB_REPOSITORY\" -e SHA=\"$GITHUB_SHA\"\
+      \ -e REF=\"$GITHUB_REF\" \\\n  -e RUN_URL=\"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\"\
+      \ \\\n  \"$SCANNER_IMAGE\" --path \"$target\" --reports sawone-si-reports\n\
+      code=$?\nset -e\necho \"code=$code\" >> \"$GITHUB_OUTPUT\"\necho \"reports=$target/sawone-si-reports\"\
+      \ >> \"$GITHUB_OUTPUT\"\necho \"passed=$([ \"$code\" = 0 ] && echo true || echo\
+      \ false)\" >> \"$GITHUB_OUTPUT\"\nif [ -f \"$target/sawone-si-reports/summary.md\"\
+      \ ]; then cat \"$target/sawone-si-reports/summary.md\" >> \"$GITHUB_STEP_SUMMARY\"\
+      ; fi\n"
+  - name: Upload reports
+    if: always()
+    uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+    with:
+      name: ${{ inputs.artifact-name }}
+      path: ${{ steps.scan.outputs.reports }}
+      if-no-files-found: warn
+  - name: Publish to code scanning
+    if: always() && steps.scan.outputs.reports != '' && (inputs.upload-sarif == 'true'
+      || (inputs.upload-sarif == 'auto' && github.event.repository.visibility == 'public'))
+    uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee
+    with:
+      sarif_file: ${{ steps.scan.outputs.reports }}/sarif
+  - name: Result
+    shell: bash
+    env:
+      CODE: ${{ steps.scan.outputs.code }}
+    run: "case \"$CODE\" in\n  0) echo \"All security gates passed.\" ;;\n  1) echo\
+      \ \"::error::Security gates failed \u2014 see the job summary and the sawone-si-reports\
+      \ artifact.\"; exit 1 ;;\n  *) echo \"::error::Scanner error (exit $CODE) \u2014\
+      \ see sawone-si-reports/logs.\"; exit \"$CODE\" ;;\nesac\n"
